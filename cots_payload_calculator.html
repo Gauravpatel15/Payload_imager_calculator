@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>COTS Payload Performance Calculator for CubeSats</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .chart-container { position: relative; width: 100%; max-width: 800px; margin-left: auto; margin-right: auto; height: 320px; max-height: 40vh; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; background: #0284c7; cursor: pointer; border-radius: 50%; }
+        input[type="range"]::-moz-range-thumb { width: 20px; height: 20px; background: #0284c7; cursor: pointer; border-radius: 50%; }
+        .loader { border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid #3498db; width: 30px; height: 30px; -webkit-animation: spin 2s linear infinite; animation: spin 2s linear infinite; margin: 1rem auto; }
+        @-webkit-keyframes spin { 0% { -webkit-transform: rotate(0deg); } 100% { -webkit-transform: rotate(360deg); } }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <div id="app" class="container mx-auto p-4 md:p-8">
+        
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-slate-900">COTS Payload Performance Calculator for CubeSats</h1>
+            <p class="mt-2 text-lg text-slate-600">An interactive tool for modeling the on-orbit performance of COTS imagers for Earth Observation missions.</p>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+            <div class="lg:col-span-1 bg-white p-6 rounded-2xl shadow-lg space-y-6">
+                
+                <div>
+                    <h2 class="text-xl font-bold mb-4 text-slate-900 border-b pb-2">1. Select Spectral Band</h2>
+                    <select id="application-select" class="w-full p-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500">
+                        <option value="vis">VIS (Visible)</option>
+                        <option value="swir">SWIR (Short-Wave IR)</option>
+                        <option value="mwir">MWIR (Mid-Wave IR)</option>
+                        <option value="lwir">LWIR (Long-Wave IR)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <h2 class="text-xl font-bold mb-4 text-slate-900 border-b pb-2">2. Select COTS Payload</h2>
+                    <select id="detector-select" class="w-full p-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500"></select>
+                </div>
+
+                <div id="input-sections"></div>
+
+                <div id="custom-cots-section" class="hidden">
+                    <h3 class="text-lg font-semibold pt-4 text-slate-800 border-t mt-4">Add Custom COTS Payload</h3>
+                    <div id="add-cots-form" class="mt-4 space-y-2 text-sm"></div>
+                    <button id="add-cots-btn" class="mt-4 w-full bg-sky-600 text-white font-bold py-2 px-4 rounded-md hover:bg-sky-700 transition-colors">Add to List</button>
+                </div>
+
+            </div>
+
+            <div class="lg:col-span-2 space-y-8">
+                <div>
+                    <div class="flex justify-between items-center mb-4">
+                         <h2 class="text-2xl font-bold text-slate-900">Performance Dashboard</h2>
+                         <button id="download-csv-btn" class="bg-emerald-600 text-white font-bold py-2 px-4 rounded-md hover:bg-emerald-700 transition-colors text-sm">Download Results (CSV)</button>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="bg-white p-4 rounded-xl shadow text-center"><h3 class="text-sm font-medium text-slate-500">GSD</h3><p id="gsd-output" class="text-2xl font-bold text-sky-600">-</p><p class="text-xs text-slate-400">m/pixel</p></div>
+                        <div class="bg-white p-4 rounded-xl shadow text-center"><h3 class="text-sm font-medium text-slate-500">Swath Width</h3><p id="swath-output" class="text-2xl font-bold text-sky-600">-</p><p class="text-xs text-slate-400">km</p></div>
+                        <div class="bg-white p-4 rounded-xl shadow text-center"><h3 class="text-sm font-medium text-slate-500">SNR</h3><p id="snr-output" class="text-2xl font-bold text-sky-600">-</p><p id="snr-quality" class="text-xs font-semibold">-</p></div>
+                        <div id="netd-card" class="bg-white p-4 rounded-xl shadow text-center"><h3 class="text-sm font-medium text-slate-500">NETD</h3><p id="netd-output" class="text-2xl font-bold text-sky-600">-</p><p class="text-xs text-slate-400">mK</p></div>
+                    </div>
+                </div>
+                
+                <div class="bg-white p-6 rounded-2xl shadow-lg">
+                    <h3 class="text-xl font-bold mb-1 text-slate-900">AI-Powered Application Recommendations</h3>
+                    <p class="text-sm text-slate-600 mb-4">Based on the selected payload parameters, here are some potential mission applications, derived from the provided research and general knowledge.</p>
+                    <div id="recommendations-output" class="text-slate-700 prose prose-sm max-w-none"></div>
+                </div>
+
+                <div class="bg-white p-6 rounded-2xl shadow-lg">
+                    <h3 class="text-xl font-bold mb-1 text-slate-900">Noise Analysis</h3>
+                    <div class="chart-container"><canvas id="noiseChart"></canvas></div>
+                </div>
+
+                <div id="netd-chart-container" class="bg-white p-6 rounded-2xl shadow-lg">
+                    <h3 class="text-xl font-bold mb-1 text-slate-900">NETD vs. Scene Temperature</h3>
+                    <div class="chart-container"><canvas id="netdChart"></canvas></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+<script>
+const applicationPresets = {
+    vis: { name: "VIS (Visible)", spectralRadiance: 70.2, lambdaMin: 0.436, lambdaMax: 0.451, targetTemp: 288, emissivity: 0.3, isThermal: false, compatibleDetectors: ['vis_cmos_mv', 'vis_cmos_ximea'] },
+    swir: { name: "SWIR (Short-Wave IR)", spectralRadiance: 15.0, lambdaMin: 1.0, lambdaMax: 1.7, targetTemp: 295, emissivity: 0.4, isThermal: false, compatibleDetectors: ['swir_ingaas'] },
+    mwir: { name: "MWIR (Mid-Wave IR)", spectralRadiance: 2.0, lambdaMin: 3.4, lambdaMax: 4.8, targetTemp: 300, emissivity: 0.97, isThermal: true, compatibleDetectors: ['mwir_hgcdte'] },
+    lwir: { name: "LWIR (Long-Wave IR)", spectralRadiance: 0, lambdaMin: 8.0, lambdaMax: 14.0, targetTemp: 300, emissivity: 0.98, isThermal: true, compatibleDetectors: ['lwir_microbolometer_flir', 'lwir_microbolometer_tamarisk'] },
+};
+
+const detectorPresets = {
+    vis_cmos_mv: { name: "Matrix Vision mvBlueFOX-IGC-202v", pixelPitch: 3.75, fNumber: 1.4, focalLength: 16, orbitHeight: 400, atmosphericTransmission: 0.85, qe: 0.60, darkCurrent: 100, readoutNoise: 5, thermalNoiseConstant: 1, flickerNoise: 2, integrationTime: 0.5, arrayWidth: 2200, cropFactor: 0.6 },
+    vis_cmos_ximea: { name: "Ximea xiQ MQ013CG-E2", pixelPitch: 5.3, fNumber: 1.4, focalLength: 16, orbitHeight: 400, atmosphericTransmission: 0.85, qe: 0.55, darkCurrent: 80, readoutNoise: 4, thermalNoiseConstant: 1, flickerNoise: 2, integrationTime: 0.5, arrayWidth: 1280, cropFactor: 0.7 },
+    swir_ingaas: { name: "SWIR InGaAs (Generic)", pixelPitch: 15, fNumber: 2.5, focalLength: 150, orbitHeight: 500, atmosphericTransmission: 0.8, qe: 0.80, darkCurrent: 1e5, readoutNoise: 150, thermalNoiseConstant: 50, flickerNoise: 50, integrationTime: 5, arrayWidth: 1280, cropFactor: 1.0 },
+    lwir_microbolometer_flir: { name: "FLIR Boson 640", pixelPitch: 12, fNumber: 1.2, focalLength: 36, orbitHeight: 420, atmosphericTransmission: 0.9, qe: 0.8, darkCurrent: 5e6, readoutNoise: 500, thermalNoiseConstant: 300, flickerNoise: 4000, integrationTime: 14, arrayWidth: 640, cropFactor: 1.0 },
+    lwir_microbolometer_tamarisk: { name: "Tamarisk 640", pixelPitch: 17, fNumber: 1.2, focalLength: 35, orbitHeight: 420, atmosphericTransmission: 0.9, qe: 0.75, darkCurrent: 6e6, readoutNoise: 600, thermalNoiseConstant: 350, flickerNoise: 4500, integrationTime: 14, arrayWidth: 640, cropFactor: 1.0 },
+    mwir_hgcdte: { name: "MWIR HgCdTe (Generic)", pixelPitch: 15, fNumber: 2.2, focalLength: 100, orbitHeight: 420, atmosphericTransmission: 0.7, qe: 0.70, darkCurrent: 5e9, readoutNoise: 200, thermalNoiseConstant: 100, flickerNoise: 100, integrationTime: 8, arrayWidth: 640, cropFactor: 1.0 }
+};
+
+const inputSectionsContainer = document.getElementById('input-sections');
+const applicationSelect = document.getElementById('application-select');
+const detectorSelect = document.getElementById('detector-select');
+const addCotsForm = document.getElementById('add-cots-form');
+const customCotsSection = document.getElementById('custom-cots-section');
+
+const h = 6.62607015e-34, c = 2.99792458e8, k = 1.380649e-23;
+let noiseChartInstance, netdChartInstance;
+let currentInputs = {};
+
+function createInputSection(title, inputs) {
+    let section = document.createElement('div');
+    section.className = 'space-y-4';
+    let header = document.createElement('h3');
+    header.className = 'text-lg font-semibold pt-4 text-slate-800 border-t mt-4';
+    header.textContent = title;
+    section.appendChild(header);
+
+    inputs.forEach(input => {
+        let wrapper = document.createElement('div');
+        let label = document.createElement('label');
+        label.htmlFor = input.id;
+        label.className = 'block text-sm font-medium text-slate-700';
+        label.textContent = input.label;
+        wrapper.appendChild(label);
+
+        let inputEl;
+        if (input.type === 'range') {
+            inputEl = document.createElement('input');
+            inputEl.type = 'range';
+            inputEl.id = input.id;
+            inputEl.min = input.min;
+            inputEl.max = input.max;
+            inputEl.step = input.step;
+            inputEl.className = 'w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer';
+            
+            let valueDisplay = document.createElement('span');
+            valueDisplay.id = `${input.id}-value`;
+            valueDisplay.className = 'text-sm text-sky-600 font-semibold ml-2';
+            label.appendChild(valueDisplay);
+
+            inputEl.oninput = () => {
+                document.getElementById(`${input.id}-value`).textContent = `${inputEl.value} ${input.unit || ''}`;
+                calculateAll();
+            };
+        } else {
+            inputEl = document.createElement('input');
+            inputEl.type = 'number';
+            inputEl.id = input.id;
+            inputEl.step = input.step || 'any';
+            inputEl.className = 'mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500';
+            inputEl.oninput = calculateAll;
+        }
+        wrapper.appendChild(inputEl);
+        section.appendChild(wrapper);
+    });
+    return section;
+}
+
+function renderInputs(config) {
+    inputSectionsContainer.innerHTML = ''; 
+    const sections = [
+        { title: '3. Mission & Scene Parameters', inputs: [ { id: 'orbitHeight', label: 'Orbit Height', type: 'range', min: 300, max: 800, step: 5, unit: 'km' }, { id: 'targetTemp', label: 'Scene Temperature', type: 'range', min: 270, max: 330, step: 1, unit: 'K' }, { id: 'atmosphericTransmission', label: 'Atmospheric Transmission', type: 'range', min: 0.1, max: 1.0, step: 0.01, unit: '' }, { id: 'spectralRadiance', label: 'Target Spectral Radiance (W/m²/sr/µm)', type: 'number', step: 0.1 }, ] },
+        { title: '4. Optical System', inputs: [ { id: 'focalLength', label: 'Focal Length (mm)', type: 'number', step: 1 }, { id: 'fNumber', label: 'F-number (F/#)', type: 'number', step: 0.1 }, { id: 'cropFactor', label: 'Crop Factor (Lens/Sensor)', type: 'number', step: 0.01 }, ] },
+        { title: '5. Detector Properties', inputs: [ { id: 'pixelPitch', label: 'Pixel Pitch (µm)', type: 'number', step: 0.01 }, { id: 'integrationTime', label: 'Integration Time (ms)', type: 'number', step: 0.01 }, { id: 'qe', label: 'Quantum Efficiency', type: 'number', step: 0.01 }, { id: 'darkCurrent', label: 'Dark Current (e-/pixel/s)', type: 'number', step: 1 }, { id: 'readoutNoise', label: 'Readout Noise (e-)', type: 'number', step: 1 }, { id: 'flickerNoise', label: 'Flicker (1/f) Noise (e-)', type: 'number', step: 1 }, { id: 'lambdaMin', label: 'Min Wavelength (µm)', type: 'number', step: 0.001 }, { id: 'lambdaMax', label: 'Max Wavelength (µm)', type: 'number', step: 0.001 }, { id: 'arrayWidth', label: 'Detector Width (pixels)', type: 'number', step: 1 }, { id: 'thermalNoiseConstant', label: 'Thermal Noise Constant', type: 'number', step: 1 } ] }
+    ];
+
+    sections.forEach(s => { inputSectionsContainer.appendChild(createInputSection(s.title, s.inputs)); });
+
+    Object.keys(config).forEach(key => {
+        const el = document.getElementById(key);
+        if (el) {
+            el.value = config[key];
+            if (el.type === 'range') {
+                const label = el.previousElementSibling || el.parentElement.querySelector('label');
+                const unit = sections.flatMap(s => s.inputs).find(i => i.id === key)?.unit || '';
+                if(label && label.querySelector('span')) { label.querySelector('span').textContent = `${config[key]} ${unit}`; }
+            }
+        }
+    });
+}
+
+function spectralRadiance(lambda, T) {
+    const lambda_m = lambda * 1e-6;
+    const term1 = (2 * h * c * c) / Math.pow(lambda_m, 5);
+    const term2 = Math.exp((h * c) / (lambda_m * k * T)) - 1;
+    return term1 / term2;
+}
+
+function calculateAll() {
+    const appKey = applicationSelect.value;
+    const appParams = applicationPresets[appKey];
+    const detKey = detectorSelect.value;
+    const detParams = detectorPresets[detKey];
+    
+    currentInputs = {};
+    document.querySelectorAll('#input-sections input').forEach(input => {
+        currentInputs[input.id] = parseFloat(input.value);
+    });
+
+    const pixelPitch_m = currentInputs.pixelPitch * 1e-6;
+    const focalLength_m = currentInputs.focalLength * 1e-3;
+    const orbitHeight_m = currentInputs.orbitHeight * 1e3;
+    const integrationTime_s = currentInputs.integrationTime * 1e-3;
+
+    const gsd = (pixelPitch_m * orbitHeight_m) / focalLength_m;
+    const swath = (currentInputs.arrayWidth * gsd) / 1000;
+
+    const pixelArea = Math.pow(pixelPitch_m, 2);
+    const solidAngle = Math.PI / (4 * Math.pow(currentInputs.fNumber, 2));
+    const etendue = pixelArea * solidAngle;
+    
+    const cropLoss = 1 - Math.pow(currentInputs.cropFactor, 2);
+
+    let L_signal_at_sensor;
+    if (appParams.isThermal) {
+        let totalPower = 0;
+        const steps = 50;
+        const stepSize = (currentInputs.lambdaMax - currentInputs.lambdaMin) / steps;
+        for (let i = 0; i < steps; i++) {
+            const lambda = currentInputs.lambdaMin + i * stepSize;
+            totalPower += spectralRadiance(lambda, currentInputs.targetTemp);
+        }
+        const L_signal_source = totalPower * stepSize * 1e-6 * appParams.emissivity;
+        L_signal_at_sensor = L_signal_source * currentInputs.atmosphericTransmission * (1 - cropLoss);
+    } else {
+        const bandwidth_um = currentInputs.lambdaMax - currentInputs.lambdaMin;
+        L_signal_at_sensor = currentInputs.spectralRadiance * bandwidth_um * currentInputs.atmosphericTransmission * (1 - cropLoss);
+    }
+
+    const incidentPower = L_signal_at_sensor * etendue;
+    const lambda_avg_m = ((currentInputs.lambdaMin + currentInputs.lambdaMax) / 2) * 1e-6;
+    const photonEnergy = (h * c) / lambda_avg_m;
+    const photonFlux = incidentPower / photonEnergy;
+    const signalElectrons = photonFlux * currentInputs.qe * integrationTime_s;
+
+    const shotNoise = Math.sqrt(signalElectrons);
+    const darkNoise = Math.sqrt(currentInputs.darkCurrent * integrationTime_s);
+    const thermalNoise = Math.sqrt(currentInputs.thermalNoiseConstant * integrationTime_s); 
+    const readoutNoise = currentInputs.readoutNoise;
+    const flickerNoise = currentInputs.flickerNoise;
+
+    const totalNoise = Math.sqrt(Math.pow(shotNoise, 2) + Math.pow(darkNoise, 2) + Math.pow(thermalNoise, 2) + Math.pow(readoutNoise, 2) + Math.pow(flickerNoise, 2));
+    const snr = totalNoise > 0 ? signalElectrons / totalNoise : 0;
+
+    let netd = 0;
+    if (appParams.isThermal) {
+        let totalPowerPlus = 0;
+        const steps = 50;
+        const stepSize = (currentInputs.lambdaMax - currentInputs.lambdaMin) / steps;
+        for (let i = 0; i < steps; i++) {
+            const lambda = currentInputs.lambdaMin + i * stepSize;
+            totalPowerPlus += spectralRadiance(lambda, currentInputs.targetTemp + 0.1);
+        }
+        const L_signal_plus_deltaT = totalPowerPlus * stepSize * 1e-6 * appParams.emissivity * currentInputs.atmosphericTransmission * (1-cropLoss);
+        const signalElectrons_plus_deltaT = ((L_signal_plus_deltaT * etendue) / photonEnergy) * currentInputs.qe * integrationTime_s;
+        const dS_dT = (signalElectrons_plus_deltaT - signalElectrons) / 0.1;
+        netd = dS_dT > 0 ? (totalNoise / dS_dT) * 1000 : 0;
+    }
+
+    document.getElementById('gsd-output').textContent = gsd.toFixed(2);
+    document.getElementById('swath-output').textContent = swath.toFixed(1);
+    document.getElementById('snr-output').textContent = snr.toFixed(1);
+
+    const snrQualityEl = document.getElementById('snr-quality');
+    if (snr < 10) { snrQualityEl.textContent = "Poor"; snrQualityEl.className = 'text-xs font-semibold text-red-500'; }
+    else if (snr < 20) { snrQualityEl.textContent = "Acceptable"; snrQualityEl.className = 'text-xs font-semibold text-amber-500'; }
+    else if (snr < 40) { snrQualityEl.textContent = "Good"; snrQualityEl.className = 'text-xs font-semibold text-green-500'; }
+    else { snrQualityEl.textContent = "Excellent"; snrQualityEl.className = 'text-xs font-semibold text-emerald-600'; }
+    
+    const netdCard = document.getElementById('netd-card');
+    const netdChartContainer = document.getElementById('netd-chart-container');
+    document.getElementById('netd-output').textContent = appParams.isThermal ? netd.toFixed(2) : 'N/A';
+    if(netdCard) netdCard.style.display = appParams.isThermal ? 'block' : 'none';
+    if(netdChartContainer) netdChartContainer.style.display = appParams.isThermal ? 'block' : 'none';
+
+    updateNoiseChart([shotNoise, darkNoise, thermalNoise, readoutNoise, flickerNoise]);
+    if (appParams.isThermal) { updateNetdChart(); }
+}
+
+function updateNetdChart() {
+    const netdCurveData = [];
+    const appParams = applicationPresets[applicationSelect.value];
+    const lambda_avg_m = ((currentInputs.lambdaMin + currentInputs.lambdaMax) / 2) * 1e-6;
+    const photonEnergy = (h * c) / lambda_avg_m;
+    const pixelArea = Math.pow(currentInputs.pixelPitch * 1e-6, 2);
+    const solidAngle = Math.PI / (4 * Math.pow(currentInputs.fNumber, 2));
+    const etendue = pixelArea * solidAngle;
+    const integrationTime_s = currentInputs.integrationTime * 1e-3;
+
+    for (let temp = 270; temp <= 330; temp += 5) {
+        let L_source = 0, L_plus_source = 0;
+        const steps = 50, stepSize = (currentInputs.lambdaMax - currentInputs.lambdaMin) / steps;
+        for (let i = 0; i < steps; i++) {
+            const lambda = currentInputs.lambdaMin + i * stepSize;
+            L_source += spectralRadiance(lambda, temp);
+            L_plus_source += spectralRadiance(lambda, temp + 0.1);
+        }
+        L_source *= stepSize * 1e-6 * appParams.emissivity;
+        L_plus_source *= stepSize * 1e-6 * appParams.emissivity;
+        
+        const S = (L_source * currentInputs.atmosphericTransmission * etendue / photonEnergy) * currentInputs.qe * integrationTime_s;
+        const S_plus = (L_plus_source * currentInputs.atmosphericTransmission * etendue / photonEnergy) * currentInputs.qe * integrationTime_s;
+        
+        const dSdT_curve = (S_plus - S) / 0.1;
+        const shotNoise_curve = Math.sqrt(S);
+        const totalNoise_curve = Math.sqrt(Math.pow(shotNoise_curve, 2) + Math.pow(Math.sqrt(currentInputs.darkCurrent * integrationTime_s), 2) + Math.pow(Math.sqrt(currentInputs.thermalNoiseConstant * integrationTime_s), 2) + Math.pow(currentInputs.readoutNoise, 2) + Math.pow(currentInputs.flickerNoise, 2));
+        const netd_val = dSdT_curve > 0 ? (totalNoise_curve / dSdT_curve) * 1000 : 0;
+        netdCurveData.push({x: temp, y: netd_val});
+    }
+    if(netdChartInstance) { netdChartInstance.data.datasets[0].data = netdCurveData; netdChartInstance.update(); }
+}
+
+function createCharts() {
+    const noiseCtx = document.getElementById('noiseChart').getContext('2d');
+    noiseChartInstance = new Chart(noiseCtx, { type: 'bar', data: { labels: ['Shot', 'Dark', 'Thermal', 'Readout', 'Flicker'], datasets: [{ label: 'Noise (e-)', data: [], backgroundColor: ['#38bdf8', '#0ea5e9', '#0284c7', '#0369a1', '#075985'], borderWidth: 1 }] }, options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', scales: { x: { beginAtZero: true, title: { display: true, text: 'Noise Magnitude (electrons)' } } }, plugins: { legend: { display: false } } } });
+    const netdCtx = document.getElementById('netdChart').getContext('2d');
+    netdChartInstance = new Chart(netdCtx, { type: 'line', data: { datasets: [{ label: 'NETD', data: [], borderColor: '#0284c7', backgroundColor: 'rgba(2, 132, 199, 0.1)', fill: true, tension: 0.4 }] }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { type: 'linear', title: { display: true, text: 'Scene Temperature (K)' } }, y: { beginAtZero: false, title: { display: true, text: 'NETD (mK)' } } }, plugins: { legend: { display: false } } } });
+}
+
+function updateNoiseChart(data) { if(noiseChartInstance) { noiseChartInstance.data.datasets[0].data = data; noiseChartInstance.update(); } }
+
+function populateDetectorDropdown(compatibleDetectors) {
+    const currentValue = detectorSelect.value;
+    detectorSelect.innerHTML = '';
+    const allKeys = Object.keys(detectorPresets);
+    allKeys.forEach(key => {
+        if (compatibleDetectors.includes(key)) {
+            const option = document.createElement('option');
+            option.value = key;
+            option.textContent = detectorPresets[key].name;
+            detectorSelect.appendChild(option);
+        }
+    });
+    
+    const addOtherOption = document.createElement('option');
+    addOtherOption.value = 'add_other';
+    addOtherOption.textContent = 'Add Other COTS...';
+    detectorSelect.appendChild(addOtherOption);
+    
+    if (detectorPresets[currentValue]) {
+        detectorSelect.value = currentValue;
+    }
+}
+
+async function getRecommendations() {
+    const outputDiv = document.getElementById('recommendations-output');
+    outputDiv.innerHTML = '<div class="loader"></div>';
+    
+    const detKey = detectorSelect.value;
+    const detParams = detectorPresets[detKey];
+    const appKey = applicationSelect.value;
+    const appParams = applicationPresets[appKey];
+
+    const prompt = `Based on the provided research papers about CubeSat imaging payloads and your general knowledge, please suggest 3-5 potential mission applications for a COTS sensor with the following characteristics. For each suggestion, provide a brief (1-2 sentence) justification.
+    - Sensor Name: ${detParams.name}
+    - Spectral Band: ${appParams.name} (${appParams.lambdaMin}-${appParams.lambdaMax} µm)
+    - Key Performance (calculated): GSD of ~${document.getElementById('gsd-output').textContent} m, SNR of ~${document.getElementById('snr-output').textContent}
+    - Detector Type: ${appParams.isThermal ? 'Thermal (e.g., Microbolometer)' : 'Reflective (e.g., CMOS)'}
+    - Pixel Pitch: ${detParams.pixelPitch} µm
+    
+    Format the response as a simple HTML unordered list.`;
+
+    try {
+        let chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
+        const payload = { contents: chatHistory };
+        const apiKey = ""; 
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        if (result.candidates && result.candidates.length > 0 && result.candidates[0].content && result.candidates[0].content.parts && result.candidates[0].content.parts.length > 0) {
+            const text = result.candidates[0].content.parts[0].text;
+            outputDiv.innerHTML = text;
+        } else {
+            outputDiv.innerHTML = '<p class="text-red-500">Could not retrieve recommendations at this time.</p>';
+        }
+    } catch (error) {
+        console.error("Error fetching recommendations:", error);
+        outputDiv.innerHTML = '<p class="text-red-500">An error occurred while fetching recommendations.</p>';
+    }
+}
+
+function handleApplicationChange() {
+    const appKey = applicationSelect.value;
+    const appParams = applicationPresets[appKey];
+    populateDetectorDropdown(appParams.compatibleDetectors);
+    handleDetectorChange();
+}
+
+function handleDetectorChange() {
+    if (detectorSelect.value === 'add_other') {
+        customCotsSection.classList.remove('hidden');
+        inputSectionsContainer.classList.add('hidden');
+    } else {
+        customCotsSection.classList.add('hidden');
+        inputSectionsContainer.classList.remove('hidden');
+        
+        const appKey = applicationSelect.value;
+        const appParams = applicationPresets[appKey];
+        const detKey = detectorSelect.value;
+        const detParams = detectorPresets[detKey];
+        const combinedConfig = { ...detParams, ...appParams };
+        renderInputs(combinedConfig);
+        calculateAll();
+        getRecommendations();
+    }
+}
+
+function createCotsForm() {
+    const fields = [
+        { id: 'custom_name', label: 'Payload Name', type: 'text' },
+        { id: 'custom_pixelPitch', label: 'Pixel Pitch (µm)', type: 'number' },
+        { id: 'custom_fNumber', label: 'F-number', type: 'number' },
+        { id: 'custom_focalLength', label: 'Focal Length (mm)', type: 'number' },
+        { id: 'custom_qe', label: 'Quantum Efficiency', type: 'number' },
+        { id: 'custom_darkCurrent', label: 'Dark Current (e-/s)', type: 'number' },
+        { id: 'custom_readoutNoise', label: 'Readout Noise (e-)', type: 'number' },
+        { id: 'custom_flickerNoise', label: 'Flicker Noise (e-)', type: 'number' },
+        { id: 'custom_arrayWidth', label: 'Array Width (pixels)', type: 'number' },
+        { id: 'custom_cropFactor', label: 'Crop Factor', type: 'number' },
+        { id: 'custom_thermalNoiseConstant', label: 'Thermal Noise Constant', type: 'number' },
+    ];
+    fields.forEach(field => {
+        const wrapper = document.createElement('div');
+        const label = document.createElement('label');
+        label.htmlFor = field.id;
+        label.textContent = field.label;
+        label.className = 'block mb-1';
+        const input = document.createElement('input');
+        input.type = field.type;
+        input.id = field.id;
+        input.step = "any";
+        input.className = 'w-full p-1 border border-slate-300 rounded-md';
+        wrapper.appendChild(label);
+        wrapper.appendChild(input);
+        addCotsForm.appendChild(wrapper);
+    });
+}
+
+function handleAddCots() {
+    const newPayload = {};
+    const newPayloadId = 'custom_' + Date.now();
+    
+    newPayload.name = document.getElementById('custom_name').value || 'Custom Payload';
+    newPayload.pixelPitch = parseFloat(document.getElementById('custom_pixelPitch').value) || 10;
+    newPayload.fNumber = parseFloat(document.getElementById('custom_fNumber').value) || 2.0;
+    newPayload.focalLength = parseFloat(document.getElementById('custom_focalLength').value) || 50;
+    newPayload.qe = parseFloat(document.getElementById('custom_qe').value) || 0.7;
+    newPayload.darkCurrent = parseFloat(document.getElementById('custom_darkCurrent').value) || 1000;
+    newPayload.readoutNoise = parseFloat(document.getElementById('custom_readoutNoise').value) || 10;
+    newPayload.flickerNoise = parseFloat(document.getElementById('custom_flickerNoise').value) || 10;
+    newPayload.arrayWidth = parseInt(document.getElementById('custom_arrayWidth').value) || 1024;
+    newPayload.cropFactor = parseFloat(document.getElementById('custom_cropFactor').value) || 1.0;
+    newPayload.thermalNoiseConstant = parseFloat(document.getElementById('custom_thermalNoiseConstant').value) || 10;
+    
+    detectorPresets[newPayloadId] = newPayload;
+    
+    const appKey = applicationSelect.value;
+    if (!applicationPresets[appKey].compatibleDetectors.includes(newPayloadId)) {
+        applicationPresets[appKey].compatibleDetectors.push(newPayloadId);
+    }
+    
+    populateDetectorDropdown(applicationPresets[appKey].compatibleDetectors);
+    detectorSelect.value = newPayloadId;
+    handleDetectorChange();
+}
+
+function downloadCSV() {
+    const headers = ['Parameter', 'Value', 'Unit'];
+    const outputs = {
+        GSD: [document.getElementById('gsd-output').textContent, 'm/pixel'],
+        SwathWidth: [document.getElementById('swath-output').textContent, 'km'],
+        SNR: [document.getElementById('snr-output').textContent, ''],
+        NETD: [document.getElementById('netd-output').textContent, 'mK']
+    };
+
+    let csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n";
+    
+    csvContent += "--- INPUTS ---\n";
+    Object.keys(currentInputs).forEach(key => {
+        const labelEl = document.querySelector(`label[for=${key}]`);
+        const labelText = labelEl ? labelEl.firstChild.textContent : key;
+        csvContent += `${labelText},${currentInputs[key]},\n`;
+    });
+
+    csvContent += "\n--- OUTPUTS ---\n";
+    Object.keys(outputs).forEach(key => {
+        csvContent += `${key},${outputs[key][0]},${outputs[key][1]}\n`;
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "payload_performance_results.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+applicationSelect.addEventListener('change', handleApplicationChange);
+detectorSelect.addEventListener('change', handleDetectorChange);
+document.getElementById('add-cots-btn').addEventListener('click', handleAddCots);
+document.getElementById('download-csv-btn').addEventListener('click', downloadCSV);
+
+window.onload = () => {
+    createCharts();
+    createCotsForm();
+    handleApplicationChange();
+};
+
+</script>
+</body>
+</html>
